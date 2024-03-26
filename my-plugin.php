@@ -80,14 +80,22 @@ function my_plugin_assets() {
 	);
 
 	wp_enqueue_script(
-		'my-plugin-script',
-		plugin_dir_url( __FILE__ ) . 'public/js/my-plugin.js',
-		array( 'jquery' ),
+		'my-plugin-javascript',
+		plugin_dir_url( __FILE__ ) . 'public/js/my-plugin-javascript.js',
+		array(),
 		'1.0.0',
 		true
 	);
 
-	wp_localize_script( 'my-plugin-script', 'myPluginScriptObj', array( 'ajaxURL' => esc_url( admin_url( 'admin-ajax.php' ) ) ) );
+	// wp_enqueue_script(
+	// 	'my-plugin-script',
+	// 	plugin_dir_url( __FILE__ ) . 'public/js/my-plugin.js',
+	// 	array( 'jquery' ),
+	// 	'1.0.0',
+	// 	true
+	// );
+
+	// wp_localize_script( 'my-plugin-script', 'myPluginScriptObj', array( 'ajaxURL' => esc_url( admin_url( 'admin-ajax.php' ) ) ) );
 }
 add_action( 'wp_enqueue_scripts', 'my_plugin_assets' );
 
@@ -212,3 +220,74 @@ function my_plugin_form_submission_ajax_handler() {
 }
 add_action( 'wp_ajax_nopriv_post_submission_action', 'my_plugin_form_submission_ajax_handler' );
 add_action( 'wp_ajax_post_submission_action', 'my_plugin_form_submission_ajax_handler' );
+
+
+
+if ( ! function_exists( 'my_plugin_rest_init' ) ) {
+
+	function my_plugin_rest_init() {
+
+		register_rest_route(
+			'myplugin/v1',
+			'/create-post',
+			array(
+				'methods'             => 'POST',
+				'callback'            => 'my_plugin_create_post',
+				'permission_callback' => '__return_true',
+			)
+		);
+	}
+
+	add_action( 'rest_api_init', 'my_plugin_rest_init' );
+}
+
+
+function my_plugin_create_post( WP_REST_Request $request ) {
+
+	$params = $request->get_params();
+
+	$post_title = isset( $params['postTitle'] ) ? sanitize_text_field( wp_unslash( $params['postTitle'] ) ) : '';
+
+	if ( ! $post_title ) {
+		return rest_ensure_response(
+			array(
+				'success' => false,
+				'message' => 'Error! Empty post title.',
+			)
+		);
+	}
+
+	$post_content = isset( $params['postContent'] ) ? sanitize_text_field( wp_unslash( $params['postContent'] ) ) : '';
+
+	if ( ! $post_content ) {
+		return rest_ensure_response(
+			array(
+				'success' => false,
+				'message' => 'Error! Empty post content.',
+			)
+		);
+	}
+
+	$insert_post = wp_insert_post(
+		array(
+			'post_title'   => $post_title,
+			'post_content' => $post_content,
+		)
+	);
+
+	if ( 0 === $insert_post || $insert_post instanceof WP_Error ) {
+		return rest_ensure_response(
+			array(
+				'success' => false,
+				'message' => 'Error! Creating post.',
+			)
+		);
+	}
+
+	return rest_ensure_response(
+		array(
+			'success' => true,
+			'message' => 'Success! Your post has been submitted.',
+		)
+	);
+}
